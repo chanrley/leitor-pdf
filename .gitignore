@@ -38,3 +38,6 @@ build/
 
 # Pasta de arquivos que não devem ser versionados
 nsubir/
+
+# Configurações locais do Claude Code
+.claude/
