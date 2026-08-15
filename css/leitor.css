@@ -1,0 +1,253 @@
+:root {
+  --bg: #ece6d8;
+  --texto: #2b2b2b;
+  --texto-suave: #6b6b6b;
+  --acento: #a13d3d;
+  --sombra-pagina: 0 6px 22px rgba(0, 0, 0, 0.18);
+  --botao-borda: rgba(0, 0, 0, 0.18);
+  --botao-bg: rgba(0, 0, 0, 0.05);
+  --fundo-pagina: #ffffff;
+  --filtro-pagina: none;
+}
+
+html[data-tema="escuro"] {
+  --bg: #26221e;
+  --texto: #f0ece2;
+  --texto-suave: #b8b2a4;
+  --sombra-pagina: 0 10px 40px rgba(0, 0, 0, 0.5);
+  --botao-borda: rgba(255, 255, 255, 0.25);
+  --botao-bg: rgba(255, 255, 255, 0.08);
+  --fundo-pagina: #1a1815;
+  /* "Modo noturno" do PDF: como a página é um bitmap (canvas), não dá pra
+     trocar a cor do texto diretamente — invertemos as cores da imagem
+     inteira (fundo branco vira escuro, texto preto vira claro). O
+     hue-rotate(180deg) restaura o matiz original de imagens/cores do PDF,
+     evitando que fiquem com cores "negativas" estranhas. */
+  --filtro-pagina: invert(0.92) hue-rotate(180deg) contrast(0.92);
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  background: var(--bg);
+  color: var(--texto);
+  font-family: 'Georgia', 'Times New Roman', serif;
+  display: flex;
+  flex-direction: column;
+  transition: background 0.2s ease, color 0.2s ease;
+}
+
+header.topo-leitor {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 24px;
+  gap: 16px;
+}
+
+.link-voltar {
+  color: var(--texto);
+  text-decoration: none;
+  font-size: 1.3rem;
+}
+
+.titulo-leitor {
+  flex: 1;
+  text-align: center;
+  font-size: 1rem;
+  color: var(--texto-suave);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.contador-paginas {
+  font-size: 0.9rem;
+  color: var(--texto-suave);
+  min-width: 70px;
+  text-align: right;
+}
+
+.controles-zoom {
+  display: flex;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.btn-zoom,
+.btn-tema {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  border: 1px solid var(--botao-borda);
+  background: var(--botao-bg);
+  color: var(--texto);
+  font-size: 1.05rem;
+  line-height: 1;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: inherit;
+}
+
+.btn-zoom:active {
+  background: var(--acento);
+  border-color: var(--acento);
+}
+
+.btn-zoom:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+.palco {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  padding: 20px;
+  overflow: hidden;
+  touch-action: manipulation;
+  user-select: none;
+}
+
+/* MOLDURA: elemento de recorte. Fica FORA de qualquer contexto de
+   transformação 3D (não tem perspective nem preserve-3d nem transform),
+   por isso o overflow:hidden aqui é sempre respeitado, inclusive no
+   Chrome/Android. É esta moldura que define o tamanho visível da página. */
+.moldura-livro {
+  position: relative;
+  width: min(720px, 90vw);
+  aspect-ratio: 3 / 4;
+  background: var(--fundo-pagina);
+  border-radius: 4px;
+  box-shadow: var(--sombra-pagina);
+  overflow: hidden;
+  clip-path: inset(0 round 4px);
+  contain: paint;
+  isolation: isolate;
+  transition: background 0.2s ease;
+}
+
+/* A cena 3D (perspective) vive DENTRO da moldura. Como um elemento com
+   perspective achata seus descendentes num único plano de pintura, todo o
+   conteúdo do flip é recortado pela moldura acima. */
+.cena-3d {
+  position: absolute;
+  inset: 0;
+  perspective: 2400px;
+}
+
+.livro-container {
+  position: absolute;
+  inset: 0;
+  transform-style: preserve-3d;
+}
+
+.pagina-canvas-wrap {
+  position: absolute;
+  inset: 0;
+  background: var(--fundo-pagina);
+  /* Com zoom, o canvas fica maior que a moldura. Em vez de recortar
+     (overflow:hidden) simetricamente — o que corta a mesma fatia de cima e
+     de baixo e "engole" a última linha do texto —, deixamos rolar: nada do
+     conteúdo fica inacessível, só fora da vista até o leitor arrastar. */
+  overflow: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+  display: flex;
+  /* flex-start (não center) por padrão: com align-items/justify-content:
+     center, a metade do conteúdo que ultrapassa a moldura "para cima"/"para
+     a esquerda" fica fora do alcance do scroll (scrollTop/scrollLeft nunca
+     ficam negativos). O JS decide a ancoragem — canto superior-esquerdo
+     enquanto o zoom faz o conteúdo ultrapassar a moldura (rolável, nada se
+     perde), ou centralizado (classe abaixo) quando cabe inteiro. */
+  align-items: flex-start;
+  justify-content: flex-start;
+  transform-origin: left center;
+  backface-visibility: hidden;
+  transition: transform 0.55s cubic-bezier(0.45, 0.05, 0.55, 0.95), background 0.2s ease;
+}
+
+.pagina-canvas-wrap::-webkit-scrollbar {
+  display: none;
+}
+
+/* Quando a página com o zoom atual cabe na moldura em cada eixo (sem
+   overflow NESSE eixo), centralizamos NESSE eixo — fica mais agradável do
+   que grudada no canto. As duas classes são independentes (o JS/aplicarZoom
+   alterna cada uma conforme o eixo correspondente) porque é comum só um
+   eixo transbordar com zoom: o outro deve continuar centralizado com
+   espaço igual dos dois lados, em vez de ser arrastado pro canto junto. */
+.pagina-canvas-wrap--centralizada-x {
+  justify-content: center;
+}
+
+.pagina-canvas-wrap--centralizada-y {
+  align-items: center;
+}
+
+/* O zoom NÃO usa transform:scale — o canvas recebe largura/altura reais em
+   px (definidas no JS) e o PDF é re-renderizado em alta resolução. Conteúdo
+   com tamanho real é recortado de forma confiável pela moldura. O filtro
+   inverte as cores no tema escuro (fundo branco → escuro, texto preto → claro). */
+.pagina-canvas-wrap canvas,
+.pagina-canvas-wrap img {
+  display: block;
+  max-width: none;
+  max-height: none;
+  flex: none;
+  filter: var(--filtro-pagina);
+  transition: filter 0.2s ease;
+}
+
+.pagina-canvas-wrap.virando-frente {
+  transform-origin: left center;
+  transform: rotateY(-160deg);
+}
+
+.pagina-canvas-wrap.virando-verso {
+  transform-origin: right center;
+  transform: rotateY(160deg);
+}
+
+.zona-clique {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 50%;
+  cursor: pointer;
+  z-index: 5;
+}
+
+.zona-clique.esquerda { left: 0; }
+.zona-clique.direita { right: 0; }
+
+.dica-carregando {
+  color: var(--texto-suave);
+  font-size: 1rem;
+}
+
+.rodape-leitor {
+  padding: 10px 24px 22px;
+}
+
+.barra-progresso-leitor {
+  height: 5px;
+  background: var(--botao-bg);
+  border-radius: 4px;
+  overflow: hidden;
+  max-width: 720px;
+  margin: 0 auto;
+}
+
+.barra-progresso-leitor-preenchida {
+  height: 100%;
+  background: var(--acento);
+  transition: width 0.2s ease;
+}
