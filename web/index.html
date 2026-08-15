@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Minha Biblioteca</title>
+<link rel="stylesheet" href="css/biblioteca.css" />
+<script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js"></script>
+</head>
+<body>
+<header class="topo">
+  <h1>📚 Minha Biblioteca</h1>
+  <div class="acoes-topo">
+    <button class="btn-tema" title="Alternar tema claro/escuro">🌙</button>
+    <label class="btn-adicionar" for="entrada-arquivo">+ Adicionar livro</label>
+    <input id="entrada-arquivo" type="file" accept="application/pdf" multiple />
+  </div>
+</header>
+
+<main>
+  <p id="estado-vazio" class="estado-vazio" hidden>Nenhum livro ainda. Clique em "Adicionar livro" para começar.</p>
+  <div id="grade-livros" class="grade-livros"></div>
+</main>
+
+<script src="js/db.js"></script>
+<script src="js/tema.js"></script>
+<script src="js/biblioteca.js"></script>
+</body>
+</html>

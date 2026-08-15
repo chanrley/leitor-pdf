@@ -1,0 +1,1033 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+<title>Minha Biblioteca</title>
+<style>
+  :root {
+    /* Tema claro (padrão) */
+    --bg-bib: #f6f3ee;
+    --superficie: #ffffff;
+    --texto-bib: #2b2b2b;
+    --texto-suave-bib: #6b6b6b;
+    --borda: #e4ddd0;
+    --sombra: 0 6px 18px rgba(0, 0, 0, 0.12);
+
+    --bg-leitor: #ece6d8;
+    --texto-leitor: #2b2b2b;
+    --texto-suave-leitor: #6b6b6b;
+    --sombra-pagina: 0 6px 22px rgba(0, 0, 0, 0.18);
+    --fundo-pagina: #ffffff;
+    --filtro-pagina: none;
+
+    --acento: #a13d3d;
+    --acento-suave: #d98c8c;
+  }
+
+  html[data-tema="escuro"] {
+    --bg-bib: #1c1a17;
+    --superficie: #2a2723;
+    --texto-bib: #efe9dd;
+    --texto-suave-bib: #a9a296;
+    --borda: #3a352e;
+    --sombra: 0 6px 18px rgba(0, 0, 0, 0.4);
+
+    --bg-leitor: #26221e;
+    --texto-leitor: #f0ece2;
+    --texto-suave-leitor: #b8b2a4;
+    --sombra-pagina: 0 10px 40px rgba(0, 0, 0, 0.5);
+    --fundo-pagina: #1a1815;
+    /* "Modo noturno" do PDF: como a página é um bitmap (canvas), invertemos
+       as cores da imagem inteira (fundo branco → escuro, texto preto →
+       claro). hue-rotate restaura o matiz original de imagens/cores do PDF. */
+    --filtro-pagina: invert(0.92) hue-rotate(180deg) contrast(0.92);
+  }
+
+  * { box-sizing: border-box; }
+
+  html, body {
+    margin: 0;
+    height: 100%;
+    font-family: Georgia, 'Times New Roman', serif;
+    overflow: hidden;
+  }
+
+  body {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .tela { display: none; flex-direction: column; height: 100%; }
+  .tela.ativa { display: flex; }
+
+  /* ---------- Tela Biblioteca ---------- */
+
+  #tela-biblioteca {
+    background: var(--bg-bib);
+    color: var(--texto-bib);
+    transition: background 0.2s ease, color 0.2s ease;
+  }
+
+  header.topo-bib {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 14px 18px;
+    border-bottom: 1px solid var(--borda);
+    background: var(--superficie);
+    flex-shrink: 0;
+  }
+
+  header.topo-bib h1 {
+    margin: 0;
+    font-size: 1.25rem;
+    letter-spacing: 0.02em;
+  }
+
+  .btn-adicionar {
+    background: var(--acento);
+    color: #fff;
+    border: none;
+    padding: 9px 16px;
+    border-radius: 8px;
+    font-size: 0.85rem;
+    cursor: pointer;
+    font-family: inherit;
+  }
+
+  .acoes-topo-bib {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .btn-tema {
+    width: 34px;
+    height: 34px;
+    border-radius: 50%;
+    border: 1px solid var(--borda);
+    background: var(--superficie);
+    color: var(--texto-bib);
+    font-size: 1rem;
+    line-height: 1;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: inherit;
+    flex-shrink: 0;
+  }
+
+  input[type="file"] { display: none; }
+
+  main.conteudo-bib {
+    flex: 1;
+    overflow-y: auto;
+    padding: 18px;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .estado-vazio {
+    text-align: center;
+    color: var(--texto-suave-bib);
+    margin-top: 60px;
+    font-size: 1rem;
+    padding: 0 20px;
+  }
+
+  .grade-livros {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+    gap: 16px;
+  }
+
+  .card-livro {
+    background: var(--superficie);
+    border-radius: 10px;
+    box-shadow: var(--sombra);
+    overflow: hidden;
+    cursor: pointer;
+    position: relative;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .capa {
+    width: 100%;
+    aspect-ratio: 3 / 4;
+    object-fit: cover;
+    background: var(--borda);
+    display: block;
+  }
+
+  .info-livro { padding: 8px 10px 12px; }
+
+  .titulo-livro {
+    font-size: 0.82rem;
+    margin: 0 0 6px;
+    line-height: 1.3;
+    max-height: 2.6em;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .barra-progresso {
+    height: 5px;
+    background: var(--borda);
+    border-radius: 4px;
+    overflow: hidden;
+  }
+
+  .barra-progresso-preenchida {
+    height: 100%;
+    background: var(--acento-suave);
+  }
+
+  .percentual-texto {
+    font-size: 0.7rem;
+    color: var(--texto-suave-bib);
+    margin-top: 3px;
+    display: block;
+  }
+
+  .btn-remover {
+    position: absolute;
+    top: 6px;
+    right: 6px;
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    border: none;
+    background: rgba(0, 0, 0, 0.55);
+    color: #fff;
+    font-size: 0.8rem;
+    line-height: 1;
+    cursor: pointer;
+  }
+
+  /* ---------- Tela Leitor ---------- */
+
+  #tela-leitor {
+    background: var(--bg-leitor);
+    color: var(--texto-leitor);
+    transition: background 0.2s ease, color 0.2s ease;
+  }
+
+  header.topo-leitor {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 14px;
+    gap: 10px;
+    flex-shrink: 0;
+  }
+
+  .link-voltar {
+    background: none;
+    border: none;
+    color: var(--texto-leitor);
+    text-decoration: none;
+    font-size: 1.3rem;
+    cursor: pointer;
+    font-family: inherit;
+    padding: 4px 8px;
+  }
+
+  .titulo-leitor {
+    flex: 1;
+    text-align: center;
+    font-size: 0.9rem;
+    color: var(--texto-suave-leitor);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .contador-paginas {
+    font-size: 0.85rem;
+    color: var(--texto-suave-leitor);
+    min-width: 60px;
+    text-align: right;
+  }
+
+  .controles-zoom {
+    display: flex;
+    gap: 6px;
+    flex-shrink: 0;
+  }
+
+  .btn-zoom {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    border: 1px solid rgba(255, 255, 255, 0.25);
+    background: rgba(255, 255, 255, 0.08);
+    color: var(--texto-leitor);
+    font-size: 1.05rem;
+    line-height: 1;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: inherit;
+  }
+
+  .btn-zoom:active {
+    background: var(--acento);
+    border-color: var(--acento);
+  }
+
+  .btn-zoom:disabled {
+    opacity: 0.35;
+    cursor: default;
+  }
+
+  #tela-leitor .btn-tema {
+    border-color: rgba(255, 255, 255, 0.25);
+    background: rgba(255, 255, 255, 0.08);
+    color: var(--texto-leitor);
+  }
+
+  .palco {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    padding: 12px;
+    overflow: hidden;
+    touch-action: manipulation;
+    user-select: none;
+    min-height: 0;
+  }
+
+  /* MOLDURA: elemento de recorte. Fica FORA de qualquer contexto de
+     transformação 3D (sem perspective/preserve-3d/transform), por isso o
+     overflow:hidden aqui é sempre respeitado, inclusive no Chrome/Android. */
+  .moldura-livro {
+    position: relative;
+    height: 100%;
+    max-height: 100%;
+    width: auto;
+    aspect-ratio: 3 / 4;
+    max-width: 100%;
+    background: var(--fundo-pagina);
+    border-radius: 4px;
+    box-shadow: var(--sombra-pagina);
+    overflow: hidden;
+    clip-path: inset(0 round 4px);
+    contain: paint;
+    isolation: isolate;
+    transition: background 0.2s ease;
+  }
+
+  /* A cena 3D vive DENTRO da moldura: um elemento com perspective achata seus
+     descendentes num plano de pintura, que a moldura acima recorta. */
+  .cena-3d {
+    position: absolute;
+    inset: 0;
+    perspective: 1800px;
+  }
+
+  .livro-container {
+    position: absolute;
+    inset: 0;
+    transform-style: preserve-3d;
+  }
+
+  .pagina-canvas-wrap {
+    position: absolute;
+    inset: 0;
+    background: var(--fundo-pagina);
+    /* Com zoom o canvas fica maior que a moldura. Rolar em vez de recortar
+       simetricamente evita que o conteúdo que ultrapassa a moldura suma
+       sem dar pra alcançá-lo. flex-start (não center) porque overflow:auto
+       num flex centralizado nunca deixa rolar para o lado "negativo" — o
+       JS decide a ancoragem: canto superior-esquerdo enquanto o zoom faz
+       o conteúdo ultrapassar a moldura, ou centralizado (classe abaixo)
+       quando cabe inteiro. */
+    overflow: auto;
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    display: flex;
+    align-items: flex-start;
+    justify-content: flex-start;
+    transform-origin: left center;
+    backface-visibility: hidden;
+    transition: transform 0.5s cubic-bezier(0.45, 0.05, 0.55, 0.95), background 0.2s ease;
+  }
+
+  .pagina-canvas-wrap::-webkit-scrollbar {
+    display: none;
+  }
+
+  /* Quando a página com o zoom atual cabe na moldura em cada eixo,
+     centralizamos NESSE eixo (independente do outro) — evita que o eixo
+     que ainda cabe seja arrastado pro canto só porque o outro transbordou.
+     O JS (aplicarZoom) alterna cada classe conforme o eixo correspondente. */
+  .pagina-canvas-wrap--centralizada-x {
+    justify-content: center;
+  }
+
+  .pagina-canvas-wrap--centralizada-y {
+    align-items: center;
+  }
+
+  /* O zoom NÃO usa transform:scale — o canvas recebe largura/altura reais em px
+     (definidas no JS) e o PDF é re-renderizado em alta resolução. O filtro
+     inverte as cores no tema escuro (fundo branco → escuro, texto preto → claro). */
+  .pagina-canvas-wrap canvas,
+  .pagina-canvas-wrap img {
+    display: block;
+    max-width: none;
+    max-height: none;
+    flex: none;
+    filter: var(--filtro-pagina);
+    transition: filter 0.2s ease;
+  }
+
+  .pagina-canvas-wrap.virando-frente {
+    transform-origin: left center;
+    transform: rotateY(-160deg);
+  }
+
+  .pagina-canvas-wrap.virando-verso {
+    transform-origin: right center;
+    transform: rotateY(160deg);
+  }
+
+  .zona-clique {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    width: 50%;
+    z-index: 5;
+  }
+
+  .zona-clique.esquerda { left: 0; }
+  .zona-clique.direita { right: 0; }
+
+  .dica-carregando {
+    color: var(--texto-suave-leitor);
+    font-size: 0.95rem;
+  }
+
+  .rodape-leitor {
+    padding: 8px 14px 16px;
+    flex-shrink: 0;
+  }
+
+  .barra-progresso-leitor {
+    height: 5px;
+    background: rgba(255, 255, 255, 0.15);
+    border-radius: 4px;
+    overflow: hidden;
+  }
+
+  .barra-progresso-leitor-preenchida {
+    height: 100%;
+    background: var(--acento);
+    transition: width 0.2s ease;
+  }
+
+  .dica-toque {
+    text-align: center;
+    font-size: 0.72rem;
+    color: var(--texto-suave-leitor);
+    margin-top: 6px;
+  }
+</style>
+</head>
+<body>
+
+<!-- ===================== TELA BIBLIOTECA ===================== -->
+<section id="tela-biblioteca" class="tela ativa">
+  <header class="topo-bib">
+    <h1>📚 Biblioteca</h1>
+    <div class="acoes-topo-bib">
+      <button class="btn-tema" id="btn-tema-bib" title="Alternar tema claro/escuro">🌙</button>
+      <label class="btn-adicionar" for="entrada-arquivo">+ Adicionar</label>
+      <input id="entrada-arquivo" type="file" accept="application/pdf" multiple />
+    </div>
+  </header>
+  <main class="conteudo-bib">
+    <p id="estado-vazio" class="estado-vazio" hidden>Nenhum livro ainda. Toque em "+ Adicionar" para importar um PDF.</p>
+    <div id="grade-livros" class="grade-livros"></div>
+  </main>
+</section>
+
+<!-- ===================== TELA LEITOR ===================== -->
+<section id="tela-leitor" class="tela">
+  <header class="topo-leitor">
+    <button class="link-voltar" id="btn-voltar" title="Voltar à biblioteca">←</button>
+    <span class="titulo-leitor" id="titulo-leitor">Carregando…</span>
+    <div class="controles-zoom">
+      <button class="btn-tema" id="btn-tema-leitor" title="Alternar tema claro/escuro">🌙</button>
+      <button class="btn-zoom" id="btn-zoom-menos" title="Diminuir zoom">−</button>
+      <button class="btn-zoom" id="btn-zoom-mais" title="Aumentar zoom">+</button>
+    </div>
+    <span class="contador-paginas" id="contador-paginas"></span>
+  </header>
+
+  <div class="palco" id="palco">
+    <p class="dica-carregando" id="dica-carregando">Carregando livro…</p>
+    <div class="moldura-livro" id="moldura-livro" hidden>
+      <div class="cena-3d">
+        <div class="livro-container" id="livro-container">
+          <div class="pagina-canvas-wrap" id="pagina-base">
+            <canvas id="canvas-base"></canvas>
+          </div>
+        </div>
+      </div>
+      <div class="zona-clique esquerda" id="zona-esquerda"></div>
+      <div class="zona-clique direita" id="zona-direita"></div>
+    </div>
+  </div>
+
+  <div class="rodape-leitor">
+    <div class="barra-progresso-leitor">
+      <div class="barra-progresso-leitor-preenchida" id="barra-preenchida"></div>
+    </div>
+    <p class="dica-toque">Toque à esquerda = página anterior · Toque à direita = próxima página</p>
+  </div>
+</section>
+
+<script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js"></script>
+<script>
+(() => {
+  pdfjsLib.GlobalWorkerOptions.workerSrc =
+    'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.worker.min.js';
+
+  // Bloqueio extra do pinch-zoom nativo do navegador (o meta viewport com
+  // user-scalable=no não é suficiente em aparelhos com "Forçar zoom" ativado
+  // nas opções de acessibilidade do Chrome — isso amplia a PÁGINA inteira,
+  // incluindo o cabeçalho, e não deve ser confundido com o zoom da página
+  // (botões +/-), que só afeta o canvas).
+  document.addEventListener('touchmove', (ev) => {
+    if (ev.touches.length > 1) ev.preventDefault();
+  }, { passive: false });
+  document.addEventListener('gesturestart', (ev) => ev.preventDefault());
+
+  // ---------------------------------------------------------------
+  // Tema claro/escuro (persistido em localStorage)
+  // ---------------------------------------------------------------
+  const CHAVE_TEMA = 'leitor-pdf-tema';
+  const btnTemaBib = document.getElementById('btn-tema-bib');
+  const btnTemaLeitor = document.getElementById('btn-tema-leitor');
+
+  function aplicarTema(tema) {
+    document.documentElement.setAttribute('data-tema', tema);
+    const icone = tema === 'escuro' ? '☀️' : '🌙';
+    btnTemaBib.textContent = icone;
+    btnTemaLeitor.textContent = icone;
+  }
+
+  function alternarTema() {
+    const atual = document.documentElement.getAttribute('data-tema') === 'escuro' ? 'escuro' : 'claro';
+    const proximo = atual === 'escuro' ? 'claro' : 'escuro';
+    localStorage.setItem(CHAVE_TEMA, proximo);
+    aplicarTema(proximo);
+  }
+
+  const temaSalvo = localStorage.getItem(CHAVE_TEMA)
+    || (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'escuro' : 'claro');
+  aplicarTema(temaSalvo);
+
+  btnTemaBib.addEventListener('click', alternarTema);
+  btnTemaLeitor.addEventListener('click', alternarTema);
+
+  // Registra o service worker (cache do app + PDF.js) para permitir uso offline.
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('sw.js').catch((e) => {
+        console.warn('Não foi possível registrar o service worker.', e);
+      });
+    });
+  }
+
+  // ---------------------------------------------------------------
+  // Camada de armazenamento: IndexedDB (Blob dos PDFs) + localStorage (metadados)
+  // ---------------------------------------------------------------
+  const DB_NOME = 'leitor-pdf-db';
+  const DB_VERSAO = 1;
+  const STORE_ARQUIVOS = 'arquivos';
+  const CHAVE_INDICE = 'leitor-pdf-biblioteca';
+
+  let dbPromise = null;
+  function abrirDB() {
+    if (dbPromise) return dbPromise;
+    dbPromise = new Promise((resolve, reject) => {
+      const req = indexedDB.open(DB_NOME, DB_VERSAO);
+      req.onupgradeneeded = () => {
+        const db = req.result;
+        if (!db.objectStoreNames.contains(STORE_ARQUIVOS)) {
+          db.createObjectStore(STORE_ARQUIVOS);
+        }
+      };
+      req.onsuccess = () => resolve(req.result);
+      req.onerror = () => reject(req.error);
+    });
+    return dbPromise;
+  }
+
+  async function salvarArquivo(id, blob) {
+    const db = await abrirDB();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(STORE_ARQUIVOS, 'readwrite');
+      tx.objectStore(STORE_ARQUIVOS).put(blob, id);
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => reject(tx.error);
+    });
+  }
+
+  async function lerArquivo(id) {
+    const db = await abrirDB();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(STORE_ARQUIVOS, 'readonly');
+      const req = tx.objectStore(STORE_ARQUIVOS).get(id);
+      req.onsuccess = () => resolve(req.result || null);
+      req.onerror = () => reject(req.error);
+    });
+  }
+
+  async function removerArquivo(id) {
+    const db = await abrirDB();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(STORE_ARQUIVOS, 'readwrite');
+      tx.objectStore(STORE_ARQUIVOS).delete(id);
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => reject(tx.error);
+    });
+  }
+
+  function gerarId(arquivo) {
+    return `${arquivo.name}-${arquivo.size}-${arquivo.lastModified}`;
+  }
+
+  function lerIndice() {
+    try {
+      const bruto = localStorage.getItem(CHAVE_INDICE);
+      return bruto ? JSON.parse(bruto) : {};
+    } catch (e) {
+      console.error('Falha ao ler índice da biblioteca', e);
+      return {};
+    }
+  }
+
+  function salvarIndice(indice) {
+    localStorage.setItem(CHAVE_INDICE, JSON.stringify(indice));
+  }
+
+  function listarLivros() {
+    const indice = lerIndice();
+    return Object.values(indice).sort((a, b) => b.atualizadoEm - a.atualizadoEm);
+  }
+
+  function obterLivro(id) {
+    return lerIndice()[id] || null;
+  }
+
+  function salvarMetadadoLivro(meta) {
+    const indice = lerIndice();
+    indice[meta.id] = meta;
+    salvarIndice(indice);
+  }
+
+  function removerMetadadoLivro(id) {
+    const indice = lerIndice();
+    delete indice[id];
+    salvarIndice(indice);
+  }
+
+  function atualizarProgresso(id, paginaAtual, totalPaginas) {
+    const indice = lerIndice();
+    const meta = indice[id];
+    if (!meta) return;
+    meta.paginaAtual = paginaAtual;
+    meta.totalPaginas = totalPaginas;
+    meta.percentual = totalPaginas > 0 ? Math.round((paginaAtual / totalPaginas) * 100) : 0;
+    meta.atualizadoEm = Date.now();
+    salvarIndice(indice);
+  }
+
+  // Lembra o nível de zoom escolhido, individualmente por livro (como a
+  // página atual). Não mexe em atualizadoEm — só trocar o zoom não deve
+  // reordenar a biblioteca por "lido recentemente".
+  function salvarZoom(id, zoom) {
+    const indice = lerIndice();
+    const meta = indice[id];
+    if (!meta) return;
+    meta.zoom = zoom;
+    salvarIndice(indice);
+  }
+
+  // ---------------------------------------------------------------
+  // Navegação entre telas
+  // ---------------------------------------------------------------
+  const telaBiblioteca = document.getElementById('tela-biblioteca');
+  const telaLeitor = document.getElementById('tela-leitor');
+
+  function mostrarBiblioteca() {
+    telaLeitor.classList.remove('ativa');
+    telaBiblioteca.classList.add('ativa');
+    pdfAtual = null;
+    renderizarBiblioteca();
+  }
+
+  function mostrarLeitor(id) {
+    telaBiblioteca.classList.remove('ativa');
+    telaLeitor.classList.add('ativa');
+    abrirLivroNoLeitor(id);
+  }
+
+  // ---------------------------------------------------------------
+  // Tela Biblioteca
+  // ---------------------------------------------------------------
+  const grade = document.getElementById('grade-livros');
+  const estadoVazio = document.getElementById('estado-vazio');
+  const entradaArquivo = document.getElementById('entrada-arquivo');
+
+  function renderizarBiblioteca() {
+    const livros = listarLivros();
+    grade.innerHTML = '';
+    estadoVazio.hidden = livros.length > 0;
+
+    for (const livro of livros) {
+      const card = document.createElement('div');
+      card.className = 'card-livro';
+      card.innerHTML = `
+        <button class="btn-remover" title="Remover" data-id="${livro.id}">✕</button>
+        <img class="capa" src="${livro.thumbnail || ''}" alt="Capa de ${livro.nome}" />
+        <div class="info-livro">
+          <p class="titulo-livro">${livro.nome}</p>
+          <div class="barra-progresso">
+            <div class="barra-progresso-preenchida" style="width:${livro.percentual}%"></div>
+          </div>
+          <span class="percentual-texto">${livro.percentual}% lido</span>
+        </div>
+      `;
+      card.addEventListener('click', (ev) => {
+        if (ev.target.closest('.btn-remover')) return;
+        mostrarLeitor(livro.id);
+      });
+      card.querySelector('.btn-remover').addEventListener('click', async (ev) => {
+        ev.stopPropagation();
+        if (!confirm(`Remover "${livro.nome}" da biblioteca?`)) return;
+        await removerArquivo(livro.id);
+        removerMetadadoLivro(livro.id);
+        renderizarBiblioteca();
+      });
+      grade.appendChild(card);
+    }
+  }
+
+  async function gerarThumbnail(pdf) {
+    const pagina = await pdf.getPage(1);
+    const viewportBase = pagina.getViewport({ scale: 1 });
+    const escala = 260 / viewportBase.width;
+    const viewport = pagina.getViewport({ scale: escala });
+
+    const canvas = document.createElement('canvas');
+    canvas.width = viewport.width;
+    canvas.height = viewport.height;
+    const contexto = canvas.getContext('2d');
+    await pagina.render({ canvasContext: contexto, viewport }).promise;
+    return canvas.toDataURL('image/jpeg', 0.8);
+  }
+
+  async function importarArquivos(arquivos) {
+    for (const arquivo of arquivos) {
+      if (arquivo.type !== 'application/pdf') continue;
+      const id = gerarId(arquivo);
+      if (obterLivro(id)) continue; // já está na biblioteca
+
+      const bufferArray = await arquivo.arrayBuffer();
+      await salvarArquivo(id, arquivo);
+
+      const pdf = await pdfjsLib.getDocument({ data: bufferArray.slice(0) }).promise;
+      const thumbnail = await gerarThumbnail(pdf);
+
+      salvarMetadadoLivro({
+        id,
+        nome: arquivo.name.replace(/\.pdf$/i, ''),
+        totalPaginas: pdf.numPages,
+        paginaAtual: 1,
+        percentual: 0,
+        thumbnail,
+        atualizadoEm: Date.now(),
+      });
+    }
+    renderizarBiblioteca();
+  }
+
+  entradaArquivo.addEventListener('change', (ev) => {
+    const arquivos = Array.from(ev.target.files || []);
+    if (arquivos.length) importarArquivos(arquivos);
+    entradaArquivo.value = '';
+  });
+
+  // ---------------------------------------------------------------
+  // Tela Leitor
+  // ---------------------------------------------------------------
+  const dicaCarregando = document.getElementById('dica-carregando');
+  const molduraLivro = document.getElementById('moldura-livro');
+  const livroContainer = document.getElementById('livro-container');
+  const canvasBase = document.getElementById('canvas-base');
+  const zonaEsquerda = document.getElementById('zona-esquerda');
+  const zonaDireita = document.getElementById('zona-direita');
+  const tituloLeitor = document.getElementById('titulo-leitor');
+  const contadorPaginas = document.getElementById('contador-paginas');
+  const barraPreenchida = document.getElementById('barra-preenchida');
+  const btnVoltar = document.getElementById('btn-voltar');
+  const btnZoomMais = document.getElementById('btn-zoom-mais');
+  const btnZoomMenos = document.getElementById('btn-zoom-menos');
+
+  let pdfAtual = null;
+  let idAtual = null;
+  let paginaAtual = 1;
+  let bloqueado = false;
+
+  // Zoom: o canvas recebe largura/altura REAIS em px (sem transform:scale) e o
+  // PDF é re-renderizado em resolução maior. O recorte é feito pela
+  // .moldura-livro, que está fora do contexto 3D do flip — nunca vaza.
+  const ZOOM_MINIMO = 0.7;
+  const ZOOM_MAXIMO = 2.2;
+  const PASSO_ZOOM = 0.15;
+  let escalaZoom = 1;
+  let larguraBase = 0;
+  let alturaBase = 0;
+
+  function aplicarZoom() {
+    if (larguraBase && alturaBase) {
+      const larguraFinal = Math.round(larguraBase * escalaZoom);
+      const alturaFinal = Math.round(alturaBase * escalaZoom);
+      canvasBase.style.width = `${larguraFinal}px`;
+      canvasBase.style.height = `${alturaFinal}px`;
+
+      // Quando a página (já com zoom) cabe na moldura em cada eixo,
+      // centralizamos NESSE eixo — os dois eixos são avaliados separado,
+      // senão o eixo que ainda cabe é arrastado pro canto junto com o que
+      // transbordou. Só o eixo que não cabe mantém a ancoragem no canto +
+      // rolagem (preservarFocoZoom).
+      const wrap = document.getElementById('pagina-base');
+      if (wrap) {
+        const cabeLargura = larguraFinal <= molduraLivro.clientWidth;
+        const cabeAltura = alturaFinal <= molduraLivro.clientHeight;
+        wrap.classList.toggle('pagina-canvas-wrap--centralizada-x', cabeLargura);
+        wrap.classList.toggle('pagina-canvas-wrap--centralizada-y', cabeAltura);
+      }
+    }
+    btnZoomMais.disabled = escalaZoom >= ZOOM_MAXIMO;
+    btnZoomMenos.disabled = escalaZoom <= ZOOM_MINIMO;
+  }
+
+  // Com zoom, o canvas cresce além da moldura. O wrap (.pagina-canvas-wrap)
+  // rola em vez de recortar (overflow: auto), senão o que ultrapassa a
+  // moldura some sem dar pra alcançar. Duas situações usam a rolagem de
+  // formas diferentes:
+  //
+  // 1) Ao abrir uma página nova, começamos no canto superior-esquerdo: é
+  //    o ponto natural de início de leitura, então a primeira linha e a
+  //    margem esquerda sempre aparecem inteiras.
+  // 2) Ao mudar o zoom, preservamos o ponto focal que já estava visível
+  //    (ver preservarFocoZoom) em vez de recentralizar — recentralizar
+  //    corta a mesma fatia de cada lado (linhas cortadas nas duas pontas),
+  //    reproduzindo o bug original só que no eixo horizontal.
+  function posicionarRolagemInicial() {
+    const wrap = document.getElementById('pagina-base');
+    if (!wrap) return;
+    wrap.scrollTop = 0;
+    wrap.scrollLeft = 0;
+  }
+
+  // Executa `fn` (que redimensiona o canvas) mantendo visível o mesmo
+  // ponto da página que já estava no canto superior-esquerdo da viewport
+  // antes da mudança — não o CENTRO: quando a página ainda não tem
+  // overflow (ex.: o primeiro clique de zoom, partindo do ajuste que cabe
+  // inteiro na moldura), ancorar no centro faz fracX/fracY caírem sempre
+  // em 0.5, reproduzindo o mesmo corte simétrico do bug original.
+  // Ancorando no canto, a margem esquerda/topo continua visível desde o
+  // primeiro passo de zoom, e o crescimento acontece "para dentro"
+  // (direita/baixo).
+  async function preservarFocoZoom(fn) {
+    const wrap = document.getElementById('pagina-base');
+    if (!wrap) return fn();
+
+    const larguraAntes = wrap.scrollWidth;
+    const alturaAntes = wrap.scrollHeight;
+    const fracX = larguraAntes ? wrap.scrollLeft / larguraAntes : 0;
+    const fracY = alturaAntes ? wrap.scrollTop / alturaAntes : 0;
+
+    const resultado = await fn();
+
+    const maxLeft = Math.max(0, wrap.scrollWidth - wrap.clientWidth);
+    const maxTop = Math.max(0, wrap.scrollHeight - wrap.clientHeight);
+    wrap.scrollLeft = Math.max(0, Math.min(maxLeft, fracX * wrap.scrollWidth));
+    wrap.scrollTop = Math.max(0, Math.min(maxTop, fracY * wrap.scrollHeight));
+
+    return resultado;
+  }
+
+  async function mudarZoom(delta) {
+    const novo = Math.min(ZOOM_MAXIMO, Math.max(ZOOM_MINIMO, +(escalaZoom + delta).toFixed(2)));
+    if (novo === escalaZoom) return;
+    escalaZoom = novo;
+    await preservarFocoZoom(async () => {
+      aplicarZoom(); // resposta imediata
+      if (pdfAtual) await renderizarPagina(paginaAtual); // re-renderiza nítido
+    });
+    salvarZoom(idAtual, escalaZoom);
+  }
+
+  btnZoomMais.addEventListener('click', () => mudarZoom(PASSO_ZOOM));
+  btnZoomMenos.addEventListener('click', () => mudarZoom(-PASSO_ZOOM));
+
+  btnVoltar.addEventListener('click', mostrarBiblioteca);
+
+  async function abrirLivroNoLeitor(id) {
+    dicaCarregando.hidden = false;
+    dicaCarregando.textContent = 'Carregando livro…';
+    molduraLivro.hidden = true;
+
+    const meta = obterLivro(id);
+    if (!meta) {
+      dicaCarregando.textContent = 'Livro não encontrado.';
+      return;
+    }
+
+    idAtual = id;
+    tituloLeitor.textContent = meta.nome;
+    paginaAtual = meta.paginaAtual || 1;
+    escalaZoom = Math.min(ZOOM_MAXIMO, Math.max(ZOOM_MINIMO, meta.zoom || 1));
+
+    const blob = await lerArquivo(id);
+    if (!blob) {
+      dicaCarregando.textContent = 'Arquivo do livro não foi encontrado localmente.';
+      return;
+    }
+
+    const buffer = await blob.arrayBuffer();
+    pdfAtual = await pdfjsLib.getDocument({ data: buffer }).promise;
+
+    if (paginaAtual > pdfAtual.numPages) paginaAtual = pdfAtual.numPages;
+
+    dicaCarregando.hidden = true;
+    molduraLivro.hidden = false;
+
+    await renderizarPagina(paginaAtual);
+    posicionarRolagemInicial();
+    atualizarRodape();
+  }
+
+  async function renderizarPagina(numero) {
+    const pagina = await pdfAtual.getPage(numero);
+    const viewportBase = pagina.getViewport({ scale: 1 });
+
+    // Com zoom 1 a página cabe INTEIRA na moldura (limita largura e altura).
+    const larguraMoldura = molduraLivro.clientWidth || 450;
+    const alturaMoldura = molduraLivro.clientHeight || 600;
+    const escalaAjuste = Math.min(
+      larguraMoldura / viewportBase.width,
+      alturaMoldura / viewportBase.height
+    );
+    larguraBase = viewportBase.width * escalaAjuste;
+    alturaBase = viewportBase.height * escalaAjuste;
+
+    const densidade = Math.min(window.devicePixelRatio || 1, 2);
+    const viewport = pagina.getViewport({ scale: escalaAjuste * escalaZoom * densidade });
+
+    canvasBase.width = Math.round(viewport.width);
+    canvasBase.height = Math.round(viewport.height);
+    const contexto = canvasBase.getContext('2d');
+    await pagina.render({ canvasContext: contexto, viewport }).promise;
+
+    aplicarZoom();
+  }
+
+  function atualizarRodape() {
+    contadorPaginas.textContent = `${paginaAtual} / ${pdfAtual.numPages}`;
+    const percentual = Math.round((paginaAtual / pdfAtual.numPages) * 100);
+    barraPreenchida.style.width = `${percentual}%`;
+  }
+
+  function criarCamadaFlip(dataUrlImagem, direcao) {
+    const camada = document.createElement('div');
+    camada.className = 'pagina-canvas-wrap';
+    camada.style.zIndex = '10';
+    const img = document.createElement('img');
+    img.src = dataUrlImagem;
+    // Mesmo tamanho real (px) do canvas atual — sem transform:scale.
+    if (larguraBase && alturaBase) {
+      img.style.width = `${Math.round(larguraBase * escalaZoom)}px`;
+      img.style.height = `${Math.round(alturaBase * escalaZoom)}px`;
+    }
+    camada.appendChild(img);
+    livroContainer.appendChild(camada);
+
+    camada.offsetWidth; // força reflow antes de animar
+    camada.classList.add(direcao === 'proxima' ? 'virando-frente' : 'virando-verso');
+
+    return new Promise((resolve) => {
+      camada.addEventListener('transitionend', () => {
+        camada.remove();
+        resolve();
+      }, { once: true });
+    });
+  }
+
+  async function executar(fn) {
+    if (bloqueado || !pdfAtual) return;
+    bloqueado = true;
+    try {
+      await fn();
+    } finally {
+      bloqueado = false;
+    }
+  }
+
+  async function irParaProximaPagina() {
+    if (paginaAtual >= pdfAtual.numPages) return;
+    const snapshot = canvasBase.toDataURL('image/png');
+    const flip = criarCamadaFlip(snapshot, 'proxima');
+
+    paginaAtual += 1;
+    await renderizarPagina(paginaAtual);
+    posicionarRolagemInicial();
+    await flip;
+
+    atualizarRodape();
+    atualizarProgresso(idAtual, paginaAtual, pdfAtual.numPages);
+  }
+
+  async function irParaPaginaAnterior() {
+    if (paginaAtual <= 1) return;
+    const snapshot = canvasBase.toDataURL('image/png');
+    const flip = criarCamadaFlip(snapshot, 'anterior');
+
+    paginaAtual -= 1;
+    await renderizarPagina(paginaAtual);
+    posicionarRolagemInicial();
+    await flip;
+
+    atualizarRodape();
+    atualizarProgresso(idAtual, paginaAtual, pdfAtual.numPages);
+  }
+
+  zonaEsquerda.addEventListener('click', () => executar(irParaPaginaAnterior));
+  zonaDireita.addEventListener('click', () => executar(irParaProximaPagina));
+
+  document.addEventListener('keydown', (ev) => {
+    if (ev.key === 'ArrowLeft') executar(irParaPaginaAnterior);
+    if (ev.key === 'ArrowRight') executar(irParaProximaPagina);
+  });
+
+  // ---------------------------------------------------------------
+  // Início
+  // ---------------------------------------------------------------
+  renderizarBiblioteca();
+})();
+</script>
+</body>
+</html>

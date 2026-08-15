@@ -1,0 +1,40 @@
+# Node / npm (caso venha a usar build tools, live-server, etc.)
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+package-lock.json
+
+# Logs
+*.log
+web/server.log
+
+# Ambiente
+.env
+.env.local
+.env.*.local
+
+# Sistema operacional
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Editores / IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Build / cache
+dist/
+build/
+.cache/
+.parcel-cache/
+
+# Arquivos temporários
+*.tmp
+*.bak
+
+# Pasta de arquivos que não devem ser versionados
+nsubir/

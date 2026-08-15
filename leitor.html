@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+<title>Leitor</title>
+<link rel="stylesheet" href="css/leitor.css" />
+<script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js"></script>
+</head>
+<body>
+<header class="topo-leitor">
+  <a class="link-voltar" href="index.html" title="Voltar à biblioteca">←</a>
+  <span class="titulo-leitor" id="titulo-leitor">Carregando…</span>
+  <div class="controles-zoom">
+    <button class="btn-tema" title="Alternar tema claro/escuro">🌙</button>
+    <button class="btn-zoom" id="btn-zoom-menos" title="Diminuir zoom">−</button>
+    <button class="btn-zoom" id="btn-zoom-mais" title="Aumentar zoom">+</button>
+  </div>
+  <span class="contador-paginas" id="contador-paginas"></span>
+</header>
+
+<div class="palco" id="palco">
+  <p class="dica-carregando" id="dica-carregando">Carregando livro…</p>
+  <div class="moldura-livro" id="moldura-livro" hidden>
+    <div class="cena-3d">
+      <div class="livro-container" id="livro-container">
+        <div class="pagina-canvas-wrap" id="pagina-base">
+          <canvas id="canvas-base"></canvas>
+        </div>
+      </div>
+    </div>
+    <div class="zona-clique esquerda" id="zona-esquerda" title="Página anterior"></div>
+    <div class="zona-clique direita" id="zona-direita" title="Próxima página"></div>
+  </div>
+</div>
+
+<div class="rodape-leitor">
+  <div class="barra-progresso-leitor">
+    <div class="barra-progresso-leitor-preenchida" id="barra-preenchida"></div>
+  </div>
+</div>
+
+<script src="js/db.js"></script>
+<script src="js/tema.js"></script>
+<script src="js/flip.js"></script>
+<script src="js/leitor.js"></script>
+</body>
+</html>
