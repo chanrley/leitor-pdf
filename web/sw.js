@@ -2,15 +2,19 @@
 // biblioteca PDF.js (CDN) para que o leitor funcione sem internet depois da
 // primeira visita. Os PDFs importados já ficam no IndexedDB (não aqui).
 
-const CACHE_VERSAO = 'leitor-pdf-cache-v1';
+const CACHE_VERSAO = 'leitor-pdf-cache-v2';
 
 const ARQUIVOS_APP_SHELL = [
   './',
   './index.html',
   './leitor.html',
-  './teste.html',
+  './leitor-pdf-android.html',
   './css/biblioteca.css',
   './css/leitor.css',
+  './manifest.json',
+  './icons/icon-192.png',
+  './icons/icon-512.png',
+  './icons/icon-maskable-512.png',
   './js/db.js',
   './js/tema.js',
   './js/biblioteca.js',

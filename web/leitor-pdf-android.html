@@ -4,6 +4,8 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
 <title>Minha Biblioteca</title>
+<link rel="manifest" href="manifest.json" />
+<meta name="theme-color" content="#a13d3d" />
 <style>
   :root {
     /* Tema claro (padrão) */
@@ -90,6 +92,17 @@
     color: #fff;
     border: none;
     padding: 9px 16px;
+    border-radius: 8px;
+    font-size: 0.85rem;
+    cursor: pointer;
+    font-family: inherit;
+  }
+
+  .btn-instalar {
+    background: none;
+    color: var(--acento);
+    border: 1px solid var(--acento);
+    padding: 8px 14px;
     border-radius: 8px;
     font-size: 0.85rem;
     cursor: pointer;
@@ -447,6 +460,7 @@
   <header class="topo-bib">
     <h1>📚 Biblioteca</h1>
     <div class="acoes-topo-bib">
+      <button class="btn-instalar" id="btn-instalar" title="Instalar aplicativo" hidden>⬇ Instalar</button>
       <button class="btn-tema" id="btn-tema-bib" title="Alternar tema claro/escuro">🌙</button>
       <label class="btn-adicionar" for="entrada-arquivo">+ Adicionar</label>
       <input id="entrada-arquivo" type="file" accept="application/pdf" multiple />
@@ -545,6 +559,41 @@
         console.warn('Não foi possível registrar o service worker.', e);
       });
     });
+  }
+
+  // ---------------------------------------------------------------
+  // Botão "Instalar" (PWA no Android/Chrome)
+  // ---------------------------------------------------------------
+  const btnInstalar = document.getElementById('btn-instalar');
+  let promptInstalacao = null;
+
+  // O Chrome só dispara esse evento se manifest.json + ícones + service
+  // worker + HTTPS estiverem OK. Guardamos o evento para disparar depois,
+  // no clique do usuário (navegadores exigem gesto do usuário aqui).
+  window.addEventListener('beforeinstallprompt', (ev) => {
+    ev.preventDefault();
+    promptInstalacao = ev;
+    btnInstalar.hidden = false;
+  });
+
+  btnInstalar.addEventListener('click', async () => {
+    if (!promptInstalacao) return;
+    btnInstalar.disabled = true;
+    promptInstalacao.prompt();
+    const { outcome } = await promptInstalacao.userChoice;
+    console.log('Resultado da instalação:', outcome);
+    promptInstalacao = null;
+    btnInstalar.hidden = true;
+    btnInstalar.disabled = false;
+  });
+
+  // Já instalado (aberto em modo standalone) ou instalação concluída: some com o botão.
+  window.addEventListener('appinstalled', () => {
+    btnInstalar.hidden = true;
+    promptInstalacao = null;
+  });
+  if (window.matchMedia('(display-mode: standalone)').matches) {
+    btnInstalar.hidden = true;
   }
 
   // ---------------------------------------------------------------
