@@ -415,12 +415,34 @@
     position: absolute;
     top: 0;
     bottom: 0;
-    width: 50%;
+    width: 28%;
     z-index: 5;
   }
 
   .zona-clique.esquerda { left: 0; }
   .zona-clique.direita { right: 0; }
+
+  /* Faixa central: não vira página. Segurando o dedo parado aqui por um
+     instante, o gesto vira "arraste" — move a página (útil com zoom, quando
+     o conteúdo passa da moldura) deslizando o dedo pra qualquer direção da
+     tela, sem precisar ficar em cima do texto o tempo todo, porque o
+     cálculo usa a variação da posição do toque (delta), não a posição
+     absoluta. touch-action:none evita que o navegador tente rolar a
+     página do site por baixo enquanto o gesto está em andamento. */
+  .zona-central {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 28%;
+    right: 28%;
+    z-index: 5;
+    cursor: grab;
+    touch-action: none;
+  }
+
+  .zona-central.arrastando {
+    cursor: grabbing;
+  }
 
   .dica-carregando {
     color: var(--texto-suave-leitor);
@@ -496,6 +518,7 @@
         </div>
       </div>
       <div class="zona-clique esquerda" id="zona-esquerda"></div>
+      <div class="zona-central" id="zona-central" title="Segure e arraste para mover a página"></div>
       <div class="zona-clique direita" id="zona-direita"></div>
     </div>
   </div>
@@ -504,7 +527,7 @@
     <div class="barra-progresso-leitor">
       <div class="barra-progresso-leitor-preenchida" id="barra-preenchida"></div>
     </div>
-    <p class="dica-toque">Toque à esquerda = página anterior · Toque à direita = próxima página</p>
+    <p class="dica-toque">Esquerda = página anterior · Direita = próxima · Segure o centro para arrastar</p>
   </div>
 </section>
 
@@ -826,6 +849,7 @@
   const canvasBase = document.getElementById('canvas-base');
   const zonaEsquerda = document.getElementById('zona-esquerda');
   const zonaDireita = document.getElementById('zona-direita');
+  const zonaCentral = document.getElementById('zona-central');
   const tituloLeitor = document.getElementById('titulo-leitor');
   const contadorPaginas = document.getElementById('contador-paginas');
   const barraPreenchida = document.getElementById('barra-preenchida');
@@ -1066,6 +1090,85 @@
 
   zonaEsquerda.addEventListener('click', () => executar(irParaPaginaAnterior));
   zonaDireita.addEventListener('click', () => executar(irParaProximaPagina));
+
+  // ---------------------------------------------------------------
+  // Gesto de "segurar e arrastar" na faixa central: com zoom, o
+  // conteúdo fica maior que a moldura e o leitor quer mover o texto pra
+  // enxergar uma parte fora da vista. Só entra em modo de arraste depois
+  // que o dedo fica parado por LIMIAR_TOQUE ms — se mexer antes disso, o
+  // gesto é cancelado (não compete com um toque rápido).
+  (function registrarArrasteCentral() {
+    const LIMIAR_TOQUE = 220; // ms parado até o arraste "ligar"
+    const TOLERANCIA_MOVIMENTO = 8; // px de folga antes do limiar
+
+    let temporizador = null;
+    let arrastando = false;
+    let ponteiroId = null;
+    let inicioX = 0;
+    let inicioY = 0;
+    let ultimoX = 0;
+    let ultimoY = 0;
+
+    function limparTemporizador() {
+      if (temporizador) {
+        clearTimeout(temporizador);
+        temporizador = null;
+      }
+    }
+
+    function iniciarArraste() {
+      temporizador = null;
+      arrastando = true;
+      zonaCentral.classList.add('arrastando');
+    }
+
+    function finalizarArraste() {
+      limparTemporizador();
+      if (arrastando) {
+        arrastando = false;
+        zonaCentral.classList.remove('arrastando');
+      }
+      if (ponteiroId !== null && zonaCentral.hasPointerCapture(ponteiroId)) {
+        zonaCentral.releasePointerCapture(ponteiroId);
+      }
+      ponteiroId = null;
+    }
+
+    zonaCentral.addEventListener('pointerdown', (ev) => {
+      if (ev.pointerType === 'mouse' && ev.button !== 0) return;
+      ponteiroId = ev.pointerId;
+      inicioX = ultimoX = ev.clientX;
+      inicioY = ultimoY = ev.clientY;
+      zonaCentral.setPointerCapture(ponteiroId);
+      limparTemporizador();
+      temporizador = setTimeout(iniciarArraste, LIMIAR_TOQUE);
+    });
+
+    zonaCentral.addEventListener('pointermove', (ev) => {
+      if (ev.pointerId !== ponteiroId) return;
+
+      if (!arrastando) {
+        const dist = Math.hypot(ev.clientX - inicioX, ev.clientY - inicioY);
+        if (dist > TOLERANCIA_MOVIMENTO) limparTemporizador();
+        return;
+      }
+
+      ev.preventDefault();
+      const dx = ev.clientX - ultimoX;
+      const dy = ev.clientY - ultimoY;
+      ultimoX = ev.clientX;
+      ultimoY = ev.clientY;
+
+      const wrap = document.getElementById('pagina-base');
+      if (wrap) {
+        wrap.scrollLeft -= dx;
+        wrap.scrollTop -= dy;
+      }
+    });
+
+    zonaCentral.addEventListener('pointerup', finalizarArraste);
+    zonaCentral.addEventListener('pointercancel', finalizarArraste);
+  })();
 
   document.addEventListener('keydown', (ev) => {
     if (ev.key === 'ArrowLeft') executar(irParaPaginaAnterior);
