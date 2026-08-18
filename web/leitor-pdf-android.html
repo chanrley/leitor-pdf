@@ -415,33 +415,43 @@
     position: absolute;
     top: 0;
     bottom: 0;
-    width: 33%;
+    width: 50%;
     z-index: 5;
   }
 
   .zona-clique.esquerda { left: 0; }
   .zona-clique.direita { right: 0; }
 
-  /* Faixa central: não vira página. Segurando o dedo parado aqui por um
-     instante, o gesto vira "arraste" — move a página (útil com zoom, quando
-     o conteúdo passa da moldura) deslizando o dedo pra qualquer direção da
-     tela, sem precisar ficar em cima do texto o tempo todo, porque o
-     cálculo usa a variação da posição do toque (delta), não a posição
-     absoluta. touch-action:none evita que o navegador tente rolar a
-     página do site por baixo enquanto o gesto está em andamento. */
-  .zona-central {
+  /* Camada de arraste: cobre a moldura inteira, mas fica "transparente a
+     cliques" (pointer-events:none) enquanto o modo mover não está ligado —
+     assim as zonas de virar página abaixo continuam recebendo o toque
+     normalmente. Só quando o botão "✥ Mover" ativa a classe .ativa é que
+     ela passa a capturar o toque, e um único dedo (sem duplo-toque) arrasta
+     a página pra qualquer posição, em qualquer lugar da tela — o cálculo
+     usa a variação da posição do toque (delta), não a posição absoluta.
+     touch-action:none evita que o navegador tente rolar a página do site
+     por baixo enquanto o gesto está em andamento. */
+  .zona-mover {
     position: absolute;
-    top: 0;
-    bottom: 0;
-    left: 33%;
-    right: 33%;
-    z-index: 5;
+    inset: 0;
+    z-index: 6;
     cursor: grab;
     touch-action: none;
+    pointer-events: none;
   }
 
-  .zona-central.arrastando {
+  .zona-mover.ativa {
+    pointer-events: auto;
+  }
+
+  .zona-mover.arrastando {
     cursor: grabbing;
+  }
+
+  .btn-zoom#btn-mover.ativo {
+    background: var(--acento);
+    border-color: var(--acento);
+    color: #fff;
   }
 
   .dica-carregando {
@@ -500,6 +510,7 @@
     <button class="link-voltar" id="btn-voltar" title="Voltar à biblioteca">←</button>
     <span class="titulo-leitor" id="titulo-leitor">Carregando…</span>
     <div class="controles-zoom">
+      <button class="btn-zoom" id="btn-mover" title="Ligar/desligar modo mover página">✥</button>
       <button class="btn-tema" id="btn-tema-leitor" title="Alternar tema claro/escuro">🌙</button>
       <button class="btn-zoom" id="btn-zoom-menos" title="Diminuir zoom">−</button>
       <button class="btn-zoom" id="btn-zoom-mais" title="Aumentar zoom">+</button>
@@ -518,8 +529,8 @@
         </div>
       </div>
       <div class="zona-clique esquerda" id="zona-esquerda"></div>
-      <div class="zona-central" id="zona-central" title="Toque duas vezes e arraste para posicionar a página"></div>
       <div class="zona-clique direita" id="zona-direita"></div>
+      <div class="zona-mover" id="zona-mover" title="Arraste para posicionar a página"></div>
     </div>
   </div>
 
@@ -527,7 +538,7 @@
     <div class="barra-progresso-leitor">
       <div class="barra-progresso-leitor-preenchida" id="barra-preenchida"></div>
     </div>
-    <p class="dica-toque">Esquerda = página anterior · Direita = próxima · Toque 2x no centro e arraste</p>
+    <p class="dica-toque">Esquerda = página anterior · Direita = próxima · ✥ liga o modo mover</p>
   </div>
 </section>
 
@@ -849,7 +860,8 @@
   const canvasBase = document.getElementById('canvas-base');
   const zonaEsquerda = document.getElementById('zona-esquerda');
   const zonaDireita = document.getElementById('zona-direita');
-  const zonaCentral = document.getElementById('zona-central');
+  const zonaMover = document.getElementById('zona-mover');
+  const btnMover = document.getElementById('btn-mover');
   const tituloLeitor = document.getElementById('titulo-leitor');
   const contadorPaginas = document.getElementById('contador-paginas');
   const barraPreenchida = document.getElementById('barra-preenchida');
@@ -1092,63 +1104,50 @@
   zonaDireita.addEventListener('click', () => executar(irParaProximaPagina));
 
   // ---------------------------------------------------------------
-  // Gesto de "posicionamento manual" na faixa central: dois toques rápidos
-  // e próximos (duplo toque/duplo clique) no meio do texto ligam o modo de
-  // arraste — a partir daí, com o dedo ainda no ar, dá pra escolher
-  // livremente em que parte da tela o conteúdo vai ficar, deslizando pra
-  // qualquer direção (usa a variação da posição do toque -delta-, não a
-  // posição absoluta). Soltar o dedo fixa a posição escolhida.
-  (function registrarArrasteCentral() {
-    const JANELA_DUPLO_TOQUE = 350; // ms entre os dois toques
-    const TOLERANCIA_DUPLO_TOQUE = 30; // px de distância aceitável entre os dois toques
-
-    let ultimoToqueTempo = 0;
-    let ultimoToqueX = 0;
-    let ultimoToqueY = 0;
-
+  // Modo "mover página": ligado/desligado pelo botão ✥ no topo. Enquanto
+  // desligado, a camada de arraste (.zona-mover) tem pointer-events:none e
+  // não intercepta nada — zona-esquerda/direita (50% cada) continuam
+  // virando página com toque único, normalmente. Ligado, um único toque em
+  // QUALQUER lugar da tela arrasta a página pra onde o dedo for — o cálculo
+  // usa a variação da posição do toque (delta), não a posição absoluta.
+  (function registrarModoMover() {
+    let modoAtivo = false;
     let arrastando = false;
     let ponteiroId = null;
     let ultimoX = 0;
     let ultimoY = 0;
 
-    function finalizarArraste() {
-      if (arrastando) {
-        arrastando = false;
-        zonaCentral.classList.remove('arrastando');
-      }
-      if (ponteiroId !== null && zonaCentral.hasPointerCapture(ponteiroId)) {
-        zonaCentral.releasePointerCapture(ponteiroId);
-      }
-      ponteiroId = null;
+    function ligarModo() {
+      modoAtivo = true;
+      btnMover.classList.add('ativo');
+      zonaMover.classList.add('ativa');
     }
 
-    zonaCentral.addEventListener('pointerdown', (ev) => {
-      if (ev.pointerType === 'mouse' && ev.button !== 0) return;
+    function desligarModo() {
+      modoAtivo = false;
+      btnMover.classList.remove('ativo');
+      zonaMover.classList.remove('ativa');
+    }
 
-      const agora = Date.now();
-      const dist = Math.hypot(ev.clientX - ultimoToqueX, ev.clientY - ultimoToqueY);
-      const ehSegundoToque = agora - ultimoToqueTempo <= JANELA_DUPLO_TOQUE && dist <= TOLERANCIA_DUPLO_TOQUE;
+    btnMover.addEventListener('click', () => {
+      if (modoAtivo) desligarModo();
+      else ligarModo();
+    });
+
+    zonaMover.addEventListener('pointerdown', (ev) => {
+      if (!modoAtivo) return;
+      if (ev.pointerType === 'mouse' && ev.button !== 0) return;
 
       ponteiroId = ev.pointerId;
       ultimoX = ev.clientX;
       ultimoY = ev.clientY;
-      zonaCentral.setPointerCapture(ponteiroId);
-
-      if (ehSegundoToque) {
-        // Segundo toque do duplo-toque: liga o arraste já neste toque, sem
-        // esperar soltar — o dedo já pode sair movendo a página.
-        arrastando = true;
-        zonaCentral.classList.add('arrastando');
-        ultimoToqueTempo = 0; // consome o par, evita encadear um "triplo toque"
-      } else {
-        ultimoToqueTempo = agora;
-        ultimoToqueX = ev.clientX;
-        ultimoToqueY = ev.clientY;
-      }
+      arrastando = true;
+      zonaMover.classList.add('arrastando');
+      zonaMover.setPointerCapture(ponteiroId);
     });
 
-    zonaCentral.addEventListener('pointermove', (ev) => {
-      if (ev.pointerId !== ponteiroId || !arrastando) return;
+    zonaMover.addEventListener('pointermove', (ev) => {
+      if (!arrastando || ev.pointerId !== ponteiroId) return;
 
       ev.preventDefault();
       const dx = ev.clientX - ultimoX;
@@ -1163,8 +1162,18 @@
       }
     });
 
-    zonaCentral.addEventListener('pointerup', finalizarArraste);
-    zonaCentral.addEventListener('pointercancel', finalizarArraste);
+    function finalizarArraste(ev) {
+      if (!arrastando || ev.pointerId !== ponteiroId) return;
+      arrastando = false;
+      zonaMover.classList.remove('arrastando');
+      if (zonaMover.hasPointerCapture(ponteiroId)) {
+        zonaMover.releasePointerCapture(ponteiroId);
+      }
+      ponteiroId = null;
+    }
+
+    zonaMover.addEventListener('pointerup', finalizarArraste);
+    zonaMover.addEventListener('pointercancel', finalizarArraste);
   })();
 
   document.addEventListener('keydown', (ev) => {
