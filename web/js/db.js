@@ -117,3 +117,16 @@ function salvarZoom(id, zoom) {
   meta.zoom = zoom;
   salvarIndice(indice);
 }
+
+// Lembra a posição da página dentro da moldura (o quanto está rolado,
+// como fração 0-1 de largura/altura), pra sobreviver a: virar de página,
+// fechar e reabrir o app. Guardada como fração (não pixels) porque o
+// tamanho rolável muda com zoom e com o tamanho de cada página do PDF.
+function salvarPosicao(id, fracX, fracY) {
+  const indice = lerIndice();
+  const meta = indice[id];
+  if (!meta) return;
+  meta.posX = fracX;
+  meta.posY = fracY;
+  salvarIndice(indice);
+}
