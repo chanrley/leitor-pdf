@@ -518,7 +518,7 @@
         </div>
       </div>
       <div class="zona-clique esquerda" id="zona-esquerda"></div>
-      <div class="zona-central" id="zona-central" title="Segure e arraste para mover a página"></div>
+      <div class="zona-central" id="zona-central" title="Toque duas vezes e arraste para posicionar a página"></div>
       <div class="zona-clique direita" id="zona-direita"></div>
     </div>
   </div>
@@ -527,7 +527,7 @@
     <div class="barra-progresso-leitor">
       <div class="barra-progresso-leitor-preenchida" id="barra-preenchida"></div>
     </div>
-    <p class="dica-toque">Esquerda = página anterior · Direita = próxima · Segure o centro para arrastar</p>
+    <p class="dica-toque">Esquerda = página anterior · Direita = próxima · Toque 2x no centro e arraste</p>
   </div>
 </section>
 
@@ -1092,38 +1092,26 @@
   zonaDireita.addEventListener('click', () => executar(irParaProximaPagina));
 
   // ---------------------------------------------------------------
-  // Gesto de "segurar e arrastar" na faixa central: com zoom, o
-  // conteúdo fica maior que a moldura e o leitor quer mover o texto pra
-  // enxergar uma parte fora da vista. Só entra em modo de arraste depois
-  // que o dedo fica parado por LIMIAR_TOQUE ms — se mexer antes disso, o
-  // gesto é cancelado (não compete com um toque rápido).
+  // Gesto de "posicionamento manual" na faixa central: dois toques rápidos
+  // e próximos (duplo toque/duplo clique) no meio do texto ligam o modo de
+  // arraste — a partir daí, com o dedo ainda no ar, dá pra escolher
+  // livremente em que parte da tela o conteúdo vai ficar, deslizando pra
+  // qualquer direção (usa a variação da posição do toque -delta-, não a
+  // posição absoluta). Soltar o dedo fixa a posição escolhida.
   (function registrarArrasteCentral() {
-    const LIMIAR_TOQUE = 220; // ms parado até o arraste "ligar"
-    const TOLERANCIA_MOVIMENTO = 8; // px de folga antes do limiar
+    const JANELA_DUPLO_TOQUE = 350; // ms entre os dois toques
+    const TOLERANCIA_DUPLO_TOQUE = 30; // px de distância aceitável entre os dois toques
 
-    let temporizador = null;
+    let ultimoToqueTempo = 0;
+    let ultimoToqueX = 0;
+    let ultimoToqueY = 0;
+
     let arrastando = false;
     let ponteiroId = null;
-    let inicioX = 0;
-    let inicioY = 0;
     let ultimoX = 0;
     let ultimoY = 0;
 
-    function limparTemporizador() {
-      if (temporizador) {
-        clearTimeout(temporizador);
-        temporizador = null;
-      }
-    }
-
-    function iniciarArraste() {
-      temporizador = null;
-      arrastando = true;
-      zonaCentral.classList.add('arrastando');
-    }
-
     function finalizarArraste() {
-      limparTemporizador();
       if (arrastando) {
         arrastando = false;
         zonaCentral.classList.remove('arrastando');
@@ -1136,22 +1124,31 @@
 
     zonaCentral.addEventListener('pointerdown', (ev) => {
       if (ev.pointerType === 'mouse' && ev.button !== 0) return;
+
+      const agora = Date.now();
+      const dist = Math.hypot(ev.clientX - ultimoToqueX, ev.clientY - ultimoToqueY);
+      const ehSegundoToque = agora - ultimoToqueTempo <= JANELA_DUPLO_TOQUE && dist <= TOLERANCIA_DUPLO_TOQUE;
+
       ponteiroId = ev.pointerId;
-      inicioX = ultimoX = ev.clientX;
-      inicioY = ultimoY = ev.clientY;
+      ultimoX = ev.clientX;
+      ultimoY = ev.clientY;
       zonaCentral.setPointerCapture(ponteiroId);
-      limparTemporizador();
-      temporizador = setTimeout(iniciarArraste, LIMIAR_TOQUE);
+
+      if (ehSegundoToque) {
+        // Segundo toque do duplo-toque: liga o arraste já neste toque, sem
+        // esperar soltar — o dedo já pode sair movendo a página.
+        arrastando = true;
+        zonaCentral.classList.add('arrastando');
+        ultimoToqueTempo = 0; // consome o par, evita encadear um "triplo toque"
+      } else {
+        ultimoToqueTempo = agora;
+        ultimoToqueX = ev.clientX;
+        ultimoToqueY = ev.clientY;
+      }
     });
 
     zonaCentral.addEventListener('pointermove', (ev) => {
-      if (ev.pointerId !== ponteiroId) return;
-
-      if (!arrastando) {
-        const dist = Math.hypot(ev.clientX - inicioX, ev.clientY - inicioY);
-        if (dist > TOLERANCIA_MOVIMENTO) limparTemporizador();
-        return;
-      }
+      if (ev.pointerId !== ponteiroId || !arrastando) return;
 
       ev.preventDefault();
       const dx = ev.clientX - ultimoX;
