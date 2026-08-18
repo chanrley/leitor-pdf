@@ -80,40 +80,16 @@ function aplicarZoom() {
 
 // Com zoom, o canvas cresce além da moldura. O wrap (.pagina-canvas-wrap)
 // rola em vez de recortar (overflow: auto), senão o que ultrapassa a
-// moldura some sem que dê pra alcançar.
-//
-// A posição de rolagem escolhida pelo leitor é lembrada por livro e
-// reaplicada sempre — ao virar de página e ao reabrir o app — em vez de
-// voltar pro canto superior-esquerdo a cada página. Guardamos como FRAÇÃO
-// (0-1), não pixels, porque o tamanho rolável muda de página pra página e
-// com o zoom.
-function restaurarPosicaoSalva() {
+// moldura some sem que dê pra alcançar. Ao virar de página ou reabrir o
+// livro, sempre começamos no canto superior-esquerdo: é o ponto natural de
+// início de leitura, então a primeira linha e a margem esquerda aparecem
+// inteiras (ver preservarFocoZoom para o comportamento ao mudar o zoom,
+// que é diferente: preserva o ponto que já estava visível).
+function posicionarRolagemInicial() {
   const wrap = document.getElementById('pagina-base');
   if (!wrap) return;
-  const fracX = meta && typeof meta.posX === 'number' ? meta.posX : 0;
-  const fracY = meta && typeof meta.posY === 'number' ? meta.posY : 0;
-  const maxLeft = Math.max(0, wrap.scrollWidth - wrap.clientWidth);
-  const maxTop = Math.max(0, wrap.scrollHeight - wrap.clientHeight);
-  wrap.scrollLeft = Math.max(0, Math.min(maxLeft, fracX * wrap.scrollWidth));
-  wrap.scrollTop = Math.max(0, Math.min(maxTop, fracY * wrap.scrollHeight));
-}
-
-// Salva a posição atual (com debounce, pra não gravar a cada pixel rolado)
-// toda vez que o leitor rola a página.
-function registrarSalvamentoDePosicao(wrap) {
-  let temporizador = null;
-  wrap.addEventListener('scroll', () => {
-    clearTimeout(temporizador);
-    temporizador = setTimeout(() => {
-      const fracX = wrap.scrollWidth ? wrap.scrollLeft / wrap.scrollWidth : 0;
-      const fracY = wrap.scrollHeight ? wrap.scrollTop / wrap.scrollHeight : 0;
-      if (meta) {
-        meta.posX = fracX;
-        meta.posY = fracY;
-      }
-      salvarPosicao(idLivro, fracX, fracY);
-    }, 250);
-  });
+  wrap.scrollTop = 0;
+  wrap.scrollLeft = 0;
 }
 
 // Executa `fn` (que redimensiona o canvas) mantendo visível o mesmo ponto
@@ -188,11 +164,10 @@ async function iniciar() {
   molduraLivro.hidden = false;
 
   await renderizarPagina(paginaAtual);
-  restaurarPosicaoSalva();
+  posicionarRolagemInicial();
   atualizarRodape();
 
   registrarZonasDeClique(zonaEsquerda, zonaDireita, irParaPaginaAnterior, irParaProximaPagina);
-  registrarSalvamentoDePosicao(document.getElementById('pagina-base'));
 }
 
 async function renderizarPagina(numero) {
@@ -238,7 +213,7 @@ async function irParaProximaPagina() {
 
   paginaAtual += 1;
   await renderizarPagina(paginaAtual);
-  restaurarPosicaoSalva();
+  posicionarRolagemInicial();
   await flip;
 
   atualizarRodape();
@@ -255,7 +230,7 @@ async function irParaPaginaAnterior() {
 
   paginaAtual -= 1;
   await renderizarPagina(paginaAtual);
-  restaurarPosicaoSalva();
+  posicionarRolagemInicial();
   await flip;
 
   atualizarRodape();
