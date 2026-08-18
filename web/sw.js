@@ -2,7 +2,7 @@
 // biblioteca PDF.js (CDN) para que o leitor funcione sem internet depois da
 // primeira visita. Os PDFs importados já ficam no IndexedDB (não aqui).
 
-const CACHE_VERSAO = 'leitor-pdf-cache-v2';
+const CACHE_VERSAO = 'leitor-pdf-cache-v3';
 
 const ARQUIVOS_APP_SHELL = [
   './',
